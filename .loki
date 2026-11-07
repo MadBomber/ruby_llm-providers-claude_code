@@ -1,0 +1,10 @@
+# frozen_string_literal: true
+# ruby_llm-providers-claude_code — RubyLLM provider driving the Claude Code agent via claude -p
+
+import_up "repo_dev.loki"
+
+class Tasks
+  @@gem_name ||= "ruby_llm-providers-claude_code".freeze
+
+  header "ruby_llm-providers-claude_code v#{gem_version} — RubyLLM provider driving the Claude Code agent via claude -p"
+end
