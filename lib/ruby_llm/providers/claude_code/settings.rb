@@ -13,7 +13,8 @@ module RubyLLM
         DEFAULT_TIMEOUT = 600
         SYSTEM_PROMPT_MODES = %w[append replace].freeze
 
-        attr_reader :command, :cwd, :timeout, :permission_mode, :args, :system_prompt_mode, :env, :session_id
+        attr_reader :command, :cwd, :timeout, :permission_mode, :args, :system_prompt_mode, :env, :session_id,
+                    :on_event
 
         def initialize(config, provider_options = {})
           opts = self.class.namespaced(provider_options)
@@ -27,6 +28,7 @@ module RubyLLM
           end)
           @env                = self.class.stringify(opts.fetch(:env) { config.claude_code_env })
           @session_id         = opts[:session_id]
+          @on_event           = self.class.callable(opts[:on_event])
           @resume             = opts.fetch(:resume) { config.claude_code_resume.nil? || config.claude_code_resume }
         end
 
@@ -70,6 +72,14 @@ module RubyLLM
             return text if SYSTEM_PROMPT_MODES.include?(text)
 
             raise ArgumentError, "claude_code system_prompt_mode must be one of #{SYSTEM_PROMPT_MODES.join(', ')}"
+          end
+
+          # A hook handed each parsed stream-json event, or nil.
+          def callable(value)
+            return nil if value.nil?
+            return value if value.respond_to?(:call)
+
+            raise ArgumentError, 'claude_code on_event must respond to #call'
           end
 
           def stringify(value)

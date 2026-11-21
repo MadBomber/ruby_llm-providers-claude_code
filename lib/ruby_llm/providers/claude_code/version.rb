@@ -5,7 +5,7 @@ module RubyLLM
     # Version of the ruby_llm-providers-claude_code gem. Kept in its own file
     # so the gemspec can read the literal without loading the provider.
     class ClaudeCode < Provider
-      VERSION = '0.0.1'
+      VERSION = '0.0.2'
 
       def self.version
         VERSION

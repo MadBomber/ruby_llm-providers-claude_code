@@ -7,7 +7,8 @@ module RubyLLM
     class ClaudeCode < Provider
       # Spawns the CLI, feeds it stdin, and yields each stdout line on the
       # caller's thread as it arrives. The process group is killed when the
-      # timeout passes.
+      # timeout passes, and when the block raises, so a caller can stop the
+      # agent mid-run by raising from it.
       class Runner
         # What the process produced: full stdout, full stderr, and its exit status.
         Result = Data.define(:stdout, :stderr, :status)
@@ -27,6 +28,9 @@ module RubyLLM
           rescue TimeoutError
             terminate(wait)
             raise TimeoutError, "#{argv.first} did not finish within #{timeout}s"
+          rescue Exception # rubocop:disable Lint/RescueException -- no exit from the block may orphan the CLI
+            terminate(wait)
+            raise
           end
         rescue Errno::ENOENT => e
           raise Error, "cannot run #{argv.first.inspect}: #{e.message}"

@@ -69,6 +69,22 @@ class TestClaudeCodeProvider < Minitest::Test
     assert_includes Provider.runner.calls.first[:argv], 'stream-json'
   end
 
+  def test_on_event_sees_every_event_and_forces_streaming
+    Provider.runner = FakeRunner.new(ClaudeOutput.streamed('ok'))
+    events = []
+    reply = chat.with_provider_options(claude_code: { on_event: ->(event) { events << event['type'] } }).ask('x')
+    assert_equal 'ok', reply.content
+    assert_equal %w[stream_event stream_event result], events
+    assert_includes Provider.runner.calls.first[:argv], 'stream-json'
+  end
+
+  def test_on_event_error_propagates
+    Provider.runner = FakeRunner.new(ClaudeOutput.streamed('ok'))
+    hook = ->(_event) { raise ArgumentError, 'cancelled' }
+    error = assert_raises(ArgumentError) { chat.with_provider_options(claude_code: { on_event: hook }).ask('x') }
+    assert_equal 'cancelled', error.message
+  end
+
   def test_default_model_sends_no_model_flag
     Provider.runner = FakeRunner.new([ClaudeOutput.result('ok')])
     chat(model: 'default').ask('x')

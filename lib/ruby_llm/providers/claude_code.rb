@@ -25,6 +25,14 @@ module RubyLLM
     #   require 'ruby_llm/providers/claude_code'
     #   chat = RubyLLM.chat(model: 'sonnet', provider: :claude_code)
     #   chat.ask('Summarise the README in this directory')
+    #
+    # The agent's own tool calls never reach RubyLLM's tool callbacks. To
+    # watch them, pass on_event: a callable handed every parsed stream-json
+    # event (assistant messages with tool_use blocks, user messages with
+    # tool_result blocks, and so on). It forces streaming. If it raises, the
+    # CLI process is killed and the error propagates to the caller.
+    #
+    #   chat.with_provider_options(claude_code: { on_event: ->(event) { log(event) } })
     class ClaudeCode < Provider
       DEFAULT_MODEL = 'default'
       MODELS = %w[default opus sonnet haiku].freeze
@@ -110,7 +118,8 @@ module RubyLLM
         response   = Response.new(model: model, schema: schema)
         run        = runner.run(argv, stdin: transcript.prompt, cwd: settings.cwd, timeout: settings.timeout,
                                       env: settings.env) do |line|
-          response.ingest(line) { |chunk| block.call(chunk) }
+          event = response.ingest(line) { |chunk| block&.call(chunk) }
+          settings.on_event&.call(event) if event
         end
         message = response.message(run)
         session.record(messages, message, id: response.session_id)
@@ -131,7 +140,7 @@ module RubyLLM
       def build_argv(settings, model, transcript, plan, schema, thinking, block)
         Command.new(settings).build(
           model: self.class.model_id(model),
-          stream: !block.nil?,
+          stream: !(block.nil? && settings.on_event.nil?),
           resume_id: plan.resume_id,
           system_prompt: transcript.system_prompt,
           schema: schema,

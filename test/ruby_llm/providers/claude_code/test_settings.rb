@@ -58,4 +58,11 @@ class TestClaudeCodeSettings < Minitest::Test
     assert_empty Settings.namespaced(nil)
     assert_empty Settings.namespaced({ other: { a: 1 } })
   end
+
+  def test_on_event_must_be_callable
+    hook = ->(_event) {}
+    assert_same hook, Settings.new(RubyLLM.config, { claude_code: { on_event: hook } }).on_event
+    assert_nil Settings.new(RubyLLM.config, {}).on_event
+    assert_raises(ArgumentError) { Settings.new(RubyLLM.config, { claude_code: { on_event: 'nope' } }) }
+  end
 end

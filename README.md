@@ -94,6 +94,7 @@ chat = RubyLLM.chat(model: 'sonnet', provider: :claude_code)
 | `env` | none | Extra environment variables for the CLI process, as a hash; keys and values are stringified |
 | `resume` | `true` | Reuse the CLI session across turns; `false` starts a fresh session for every completion |
 | `session_id` | none | Per-chat only: continue this CLI session regardless of the transcript (see Sessions) |
+| `on_event` | none | Per-chat only: a callable handed every parsed stream-json event (see Watching the agent) |
 
 ### Working directory
 
@@ -140,6 +141,30 @@ after a two-second grace period, and the completion raises
 `RubyLLM::Providers::ClaudeCode::TimeoutError`. Agentic work on a large
 repository can legitimately take minutes, so raise it, or disable it with
 `nil`, for long tasks.
+
+### Watching the agent
+
+The agent's own tool calls never reach RubyLLM's `on_tool_call` and
+`on_tool_result` callbacks. To see them, pass `on_event`, a callable that
+receives every parsed stream-json event as a Hash. `assistant` events carry
+`tool_use` content blocks and `user` events carry `tool_result` blocks.
+Events from subagents have a `parent_tool_use_id`.
+
+```ruby
+watcher = lambda do |event|
+  next unless event['type'] == 'assistant'
+
+  event.dig('message', 'content').each do |block|
+    log_tool(block['name'], block['input']) if block['type'] == 'tool_use'
+  end
+end
+chat.with_provider_options(claude_code: { on_event: watcher })
+```
+
+Setting `on_event` switches the CLI to stream-json even when `ask` has no
+block. If the callable raises, or a streaming block passed to `ask` raises,
+the CLI's process group is killed (TERM, then KILL after the grace period)
+and the error propagates. A host can use this to stop a run mid-way.
 
 ## Models
 

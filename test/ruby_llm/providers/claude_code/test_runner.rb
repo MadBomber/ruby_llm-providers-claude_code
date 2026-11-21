@@ -33,6 +33,19 @@ class TestClaudeCodeRunner < Minitest::Test
     assert_operator Process.clock_gettime(Process::CLOCK_MONOTONIC) - started, :<, 10
   end
 
+  def test_raising_block_kills_process
+    pid = nil
+    started = Process.clock_gettime(Process::CLOCK_MONOTONIC)
+    assert_raises(ArgumentError) do
+      Runner.new.run(ruby('$stdout.sync = true; puts Process.pid; sleep 30')) do |line|
+        pid = Integer(line)
+        raise ArgumentError, 'stop'
+      end
+    end
+    assert_operator Process.clock_gettime(Process::CLOCK_MONOTONIC) - started, :<, 10
+    assert_raises(Errno::ESRCH) { Process.kill(0, pid) }
+  end
+
   def test_missing_command
     error = assert_raises(RubyLLM::Providers::ClaudeCode::Error) { Runner.new.run(['/no/such/claude-cli']) }
     assert_includes error.message, 'cannot run'
